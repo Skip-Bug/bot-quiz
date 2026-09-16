@@ -1,18 +1,15 @@
 import os
-import sys
-
-sys.stdout.reconfigure(encoding="utf-8")
 
 
 def load_quiz(path):
-    "Загружает вопросы из файла"
+    """Загружает вопросы из файла"""
     with open(path, "r", encoding="KOI8-R") as quiz_file:
         quiz_contents = quiz_file.read()
     return quiz_contents
 
 
 def collect_dict(quiz_contents):
-    "Собирает вопросы и ответы в словарь"
+    """Собирает вопросы и ответы в словарь"""
     blocks = quiz_contents.split("\n\n")
 
     quiz = {}
