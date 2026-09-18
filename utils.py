@@ -4,9 +4,21 @@ import re
 
 def clean_text(text):
     """Чистим вредные переносы и комментарии для ведущего."""
-    no_comments = re.sub(r"^\[[^\]]+\]\s*", "", text)
+    no_comments = re.sub(
+        r"\[(?:чтецу|ведущему)[^\]]*\]\s*",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
     no_breaks = re.sub(r"(?<![.!?:])\n", " ", no_comments)
     return no_breaks
+
+
+def clean_answer(text):
+    """Обрезка ответа до первого предложения и удаление пояснений в скобках."""
+    text = re.split(r"(?<=[.!?])\s+", text, maxsplit=1)[0].strip()
+    text = re.sub(r"\s*[\(\[][^\)\]]*[\)\]]\s*$", "", text)
+    return text.strip()
 
 
 def load_quiz(path):
@@ -31,7 +43,7 @@ def collect_dict(quiz_contents):
         if block.startswith("Вопрос"):
             current_question = clean_text(block.split(":", 1)[1].strip())
         elif block.startswith("Ответ") and current_question:
-            answer = clean_text(block.split(":", 1)[1].strip())
+            answer = clean_answer(clean_text(block.split(":", 1)[1].strip()))
             quiz[current_question] = answer
             current_question = None
     return quiz
