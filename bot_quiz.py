@@ -1,5 +1,6 @@
 import random
 import sys
+from enum import Enum, auto
 from functools import wraps
 
 import redis
@@ -8,6 +9,7 @@ from telegram import ChatAction, ReplyKeyboardMarkup, Update
 from telegram.ext import (
     CallbackContext,
     CommandHandler,
+    ConversationHandler,
     Filters,
     MessageHandler,
     Updater,
@@ -16,6 +18,11 @@ from telegram.ext import (
 from utils import build_collection, check
 
 sys.stdout.reconfigure(encoding="utf-8")
+
+
+class State(Enum):
+    CHOOSING = auto()
+    ANSWERING = auto()
 
 
 def send_typing_action(func):
@@ -32,7 +39,7 @@ def send_typing_action(func):
     return wrapper
 
 
-def start(update: Update, context: CallbackContext) -> None:
+def start(update: Update, context: CallbackContext) -> State:
     """Отвечает на /start и показывает клавиатуру."""
     user = update.effective_user
 
@@ -46,19 +53,26 @@ def start(update: Update, context: CallbackContext) -> None:
         text=f"Привет, {user.first_name}! Я бот для игры Викторина!",
         reply_markup=reply_markup,
     )
+    return State.CHOOSING
 
 
-def new_question(update: Update, context: CallbackContext) -> None:
-    """Отправляет случайный вопрос из коллекции."""
-    quiz_collection = context.bot_data["quiz"]
-    question, answer = random.choice(list(quiz_collection.items()))
-
+@send_typing_action
+def handle_new_question_request(update: Update, context: CallbackContext) -> State:
+    """Отправляет случайный вопрос и переходит в ANSWERING."""
     user_id = update.effective_user.id
     redis_connect = context.bot_data["redis"]
+    if redis_connect.get(f"user:{user_id}:current_answer") is not None:
+        update.message.reply_text(
+            "Сначала ответь на текущий вопрос или нажми «Сдаться»."
+        )
+        return State.ANSWERING
+
+    question, answer = random.choice(context.bot_data["quiz"])
     redis_connect.set(f"user:{user_id}:current_question", question)
     redis_connect.set(f"user:{user_id}:current_answer", answer)
 
     update.message.reply_text(question)
+    return State.ANSWERING
 
 
 def clear_current_question(user_id: int, redis_connect) -> None:
@@ -70,48 +84,74 @@ def clear_current_question(user_id: int, redis_connect) -> None:
 
 
 @send_typing_action
-def check_answer(update: Update, context: CallbackContext) -> None:
-    """Проверяет ответ пользователя."""
+def handle_solution_attempt(update: Update, context: CallbackContext) -> State:
+    """Проверяет ответ. Возвращает в CHOOSING или остаётся в ANSWERING."""
     user_id = update.effective_user.id
     redis_connect = context.bot_data["redis"]
 
     current_answer = redis_connect.get(f"user:{user_id}:current_answer")
-
     if current_answer is None:
         update.message.reply_text("Сначала нажми «Новый вопрос».")
-        return
+        return State.CHOOSING
 
     result = check(update.message.text, current_answer)
 
     if result == "correct":
         update.message.reply_text(f"Правильно! Ответ: {current_answer}")
         clear_current_question(user_id, redis_connect)
-    elif result == "close":
+        return State.CHOOSING
+
+    if result == "close":
         update.message.reply_text("Близко! Попробуй ещё раз.")
-    else:
-        update.message.reply_text(f"Неверно. Правильный ответ: {current_answer}")
-        clear_current_question(user_id, redis_connect)
+        return State.ANSWERING
+
+    update.message.reply_text(f"Неверно. Правильный ответ: {current_answer}")
+    clear_current_question(user_id, redis_connect)
+    return State.CHOOSING
 
 
 @send_typing_action
-def button_handler(update: Update, context: CallbackContext) -> None:
-    """Реагирует на нажатия кнопок."""
-    text = update.message.text
+def handle_score(update: Update, context: CallbackContext) -> None:
+    """Показывает счёт (пока заглушка)."""
+    update.message.reply_text("ТУ ДУ — мой счёт")
 
-    if text == "Новый вопрос":
-        new_question(update, context)
-    elif text == "Сдаться":
-        redis_connect = context.bot_data["redis"]
-        user_id = update.effective_user.id
-        answer = redis_connect.get(f"user:{user_id}:current_answer")
 
-        if answer is None:
-            update.message.reply_text("Сначала нажми «Новый вопрос».")
-        else:
-            update.message.reply_text(f"Правильный ответ: {answer}")
-            clear_current_question(user_id, redis_connect)
-    elif text == "Мой счёт":
-        update.message.reply_text("ТУ ДУ — мой счёт")
+def build_conv_handler() -> ConversationHandler:
+    """Собирает ConversationHandler с двумя состояниями."""
+    return ConversationHandler(
+        entry_points=[
+            CommandHandler("start", start),
+            MessageHandler(
+                Filters.regex("^Новый вопрос$"),
+                handle_new_question_request,
+            ),
+        ],
+        states={
+            State.CHOOSING: [
+                MessageHandler(
+                    Filters.regex("^Новый вопрос$"),
+                    handle_new_question_request,
+                ),
+                MessageHandler(Filters.regex("^Сдаться$"), handle_give_up),
+                MessageHandler(Filters.regex("^Мой счёт$"), handle_score),
+            ],
+            State.ANSWERING: [
+                MessageHandler(
+                    Filters.regex("^Новый вопрос$"),
+                    handle_new_question_request,
+                ),
+                MessageHandler(Filters.regex("^Сдаться$"), handle_give_up),
+                MessageHandler(Filters.regex("^Мой счёт$"), handle_score),
+                MessageHandler(
+                    Filters.text
+                    & ~Filters.command
+                    & ~Filters.regex("^(Новый вопрос|Сдаться|Мой счёт)$"),
+                    handle_solution_attempt,
+                ),
+            ],
+        },
+        fallbacks=[CommandHandler("start", start)],
+    )
 
 
 def main() -> None:
@@ -125,20 +165,9 @@ def main() -> None:
 
     dispatcher = updater.dispatcher
     dispatcher.bot_data["redis"] = redis_connect
-    quiz_collection = build_collection("quiz-questions")
-    updater.dispatcher.bot_data["quiz"] = quiz_collection
 
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(
-        MessageHandler(
-            Filters.regex("^(Новый вопрос|Сдаться|Мой счёт)$"),
-            button_handler,
-        )
-    )
-
-    dispatcher.add_handler(
-        MessageHandler(Filters.text & ~Filters.command, check_answer)
-    )
+    dispatcher.bot_data["quiz"] = list(build_collection("quiz-questions").items())
+    dispatcher.add_handler(build_conv_handler())
 
     updater.start_polling()
     updater.idle()
