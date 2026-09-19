@@ -111,6 +111,22 @@ def handle_solution_attempt(update: Update, context: CallbackContext) -> State:
 
 
 @send_typing_action
+def handle_give_up(update: Update, context: CallbackContext) -> State:
+    """Показывает правильный ответ и возвращает в CHOOSING."""
+    user_id = update.effective_user.id
+    redis_connect = context.bot_data["redis"]
+
+    answer = redis_connect.get(f"user:{user_id}:current_answer")
+    if answer is None:
+        update.message.reply_text("Сначала нажми «Новый вопрос».")
+        return State.CHOOSING
+
+    update.message.reply_text(f"Правильный ответ: {answer}")
+    clear_current_question(user_id, redis_connect)
+    return State.CHOOSING
+
+
+@send_typing_action
 def handle_score(update: Update, context: CallbackContext) -> None:
     """Показывает счёт (пока заглушка)."""
     update.message.reply_text("ТУ ДУ — мой счёт")
