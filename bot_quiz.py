@@ -13,7 +13,7 @@ from telegram.ext import (
     Updater,
 )
 
-from utils import build_collection
+from utils import build_collection, check
 
 sys.stdout.reconfigure(encoding="utf-8")
 
@@ -48,6 +48,51 @@ def start(update: Update, context: CallbackContext) -> None:
     )
 
 
+def new_question(update: Update, context: CallbackContext) -> None:
+    """Отправляет случайный вопрос из коллекции."""
+    quiz_collection = context.bot_data["quiz"]
+    question, answer = random.choice(list(quiz_collection.items()))
+
+    user_id = update.effective_user.id
+    redis_connect = context.bot_data["redis"]
+    redis_connect.set(f"user:{user_id}:current_question", question)
+    redis_connect.set(f"user:{user_id}:current_answer", answer)
+
+    update.message.reply_text(question)
+
+
+def clear_current_question(user_id: int, redis_connect) -> None:
+    """Удаляет текущий вопрос пользователя из Redis."""
+    redis_connect.delete(
+        f"user:{user_id}:current_question",
+        f"user:{user_id}:current_answer",
+    )
+
+
+@send_typing_action
+def check_answer(update: Update, context: CallbackContext) -> None:
+    """Проверяет ответ пользователя."""
+    user_id = update.effective_user.id
+    redis_connect = context.bot_data["redis"]
+
+    current_answer = redis_connect.get(f"user:{user_id}:current_answer")
+
+    if current_answer is None:
+        update.message.reply_text("Сначала нажми «Новый вопрос».")
+        return
+
+    result = check(update.message.text, current_answer)
+
+    if result == "correct":
+        update.message.reply_text(f"Правильно! Ответ: {current_answer}")
+        clear_current_question(user_id, redis_connect)
+    elif result == "close":
+        update.message.reply_text("Близко! Попробуй ещё раз.")
+    else:
+        update.message.reply_text(f"Неверно. Правильный ответ: {current_answer}")
+        clear_current_question(user_id, redis_connect)
+
+
 @send_typing_action
 def button_handler(update: Update, context: CallbackContext) -> None:
     """Реагирует на нажатия кнопок."""
@@ -56,27 +101,17 @@ def button_handler(update: Update, context: CallbackContext) -> None:
     if text == "Новый вопрос":
         new_question(update, context)
     elif text == "Сдаться":
-        update.message.reply_text("ТУ ДУ — сдаться")
+        redis_connect = context.bot_data["redis"]
+        user_id = update.effective_user.id
+        answer = redis_connect.get(f"user:{user_id}:current_answer")
+
+        if answer is None:
+            update.message.reply_text("Сначала нажми «Новый вопрос».")
+        else:
+            update.message.reply_text(f"Правильный ответ: {answer}")
+            clear_current_question(user_id, redis_connect)
     elif text == "Мой счёт":
         update.message.reply_text("ТУ ДУ — мой счёт")
-
-
-def new_question(update: Update, context: CallbackContext) -> None:
-    """Отправляет случайный вопрос из коллекции."""
-    quiz_collection = context.bot_data["quiz"]
-    question, answer = random.choice(list(quiz_collection.items()))
-
-    user_id = update.effective_user.id
-    redis_conect = context.bot_data["redis"]
-    redis_conect.set(f"user:{user_id}:current_question", question)
-    redis_conect.set(f"user:{user_id}:current_answer", answer)
-
-    update.message.reply_text(question)
-
-
-def echo(update: Update, context: CallbackContext) -> None:
-    """Отвечает как эхо."""
-    update.effective_message.reply_text(update.effective_message.text)
 
 
 def main() -> None:
@@ -100,7 +135,10 @@ def main() -> None:
             button_handler,
         )
     )
-    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, echo))
+
+    dispatcher.add_handler(
+        MessageHandler(Filters.text & ~Filters.command, check_answer)
+    )
 
     updater.start_polling()
     updater.idle()
