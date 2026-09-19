@@ -44,7 +44,13 @@ def clean_text(text):
 
 def clean_answer(text):
     """Обрезка ответа до первого предложения."""
-    return re.split(r"(?<=[.!?])\s+", text, maxsplit=1)[0].strip()
+    text = text.strip()
+    parts = re.split(r"(?<=[.!?])\s+", text, maxsplit=1)
+    if len(parts) == 1:
+        return text
+    if len(parts[0]) <= 4:
+        return text
+    return parts[0].strip()
 
 
 def fingerprint(text):
