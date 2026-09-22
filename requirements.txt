@@ -3,3 +3,4 @@ python_telegram_bot==13.15
 environs==15.2.0
 redis==8.1.0
 rapidfuzz==3.14.5
+vk_api==11.10.1
