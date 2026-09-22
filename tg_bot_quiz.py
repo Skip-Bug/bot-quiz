@@ -20,6 +20,7 @@ from utils import build_collection, check
 sys.stdout.reconfigure(encoding="utf-8")
 
 
+# TO DO добавить логер
 class State(Enum):
     CHOOSING = auto()
     ANSWERING = auto()
