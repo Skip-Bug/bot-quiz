@@ -61,15 +61,15 @@ def handle_new_question_request(update: Update, context: CallbackContext) -> Sta
     """Отправляет случайный вопрос и переходит в ANSWERING."""
     user_id = update.effective_user.id
     redis_connect = context.bot_data["redis"]
-    if redis_connect.get(f"user:{user_id}:current_answer") is not None:
+    if redis_connect.get(f"tg:user:{user_id}:current_answer") is not None:
         update.message.reply_text(
             "Сначала ответь на текущий вопрос или нажми «Сдаться»."
         )
         return State.ANSWERING
 
     question, answer = random.choice(context.bot_data["quiz"])
-    redis_connect.set(f"user:{user_id}:current_question", question)
-    redis_connect.set(f"user:{user_id}:current_answer", answer)
+    redis_connect.set(f"tg:user:{user_id}:current_question", question)
+    redis_connect.set(f"tg:user:{user_id}:current_answer", answer)
 
     update.message.reply_text(question)
     return State.ANSWERING
@@ -78,8 +78,8 @@ def handle_new_question_request(update: Update, context: CallbackContext) -> Sta
 def clear_current_question(user_id: int, redis_connect) -> None:
     """Удаляет текущий вопрос пользователя из Redis."""
     redis_connect.delete(
-        f"user:{user_id}:current_question",
-        f"user:{user_id}:current_answer",
+        f"tg:user:{user_id}:current_question",
+        f"tg:user:{user_id}:current_answer",
     )
 
 
@@ -89,7 +89,7 @@ def handle_solution_attempt(update: Update, context: CallbackContext) -> State:
     user_id = update.effective_user.id
     redis_connect = context.bot_data["redis"]
 
-    current_answer = redis_connect.get(f"user:{user_id}:current_answer")
+    current_answer = redis_connect.get(f"tg:user:{user_id}:current_answer")
     if current_answer is None:
         update.message.reply_text("Сначала нажми «Новый вопрос».")
         return State.CHOOSING
@@ -116,7 +116,7 @@ def handle_give_up(update: Update, context: CallbackContext) -> State:
     user_id = update.effective_user.id
     redis_connect = context.bot_data["redis"]
 
-    answer = redis_connect.get(f"user:{user_id}:current_answer")
+    answer = redis_connect.get(f"tg:user:{user_id}:current_answer")
     if answer is None:
         update.message.reply_text("Сначала нажми «Новый вопрос».")
         return State.CHOOSING
@@ -174,10 +174,11 @@ def main() -> None:
     """Запускает бота."""
     env = Env()
     env.read_env()
-    token = env.str("TG_BOT_TOKEN")
-    redis_connect = redis.Redis(host="localhost", port=6379, decode_responses=True)
+    tg_token = env.str("TG_BOT_TOKEN")
+    redis_url = env.str("REDIS_URL", default="redis://localhost:6379/0")
+    redis_connect = redis.from_url(redis_url, decode_responses=True)
 
-    updater = Updater(token)
+    updater = Updater(tg_token)
 
     dispatcher = updater.dispatcher
     dispatcher.bot_data["redis"] = redis_connect
