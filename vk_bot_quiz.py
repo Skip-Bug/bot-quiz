@@ -37,10 +37,12 @@ def send_message(vk_api, user_id, text, keyboard=None) -> None:
 
 
 def user_key(user_id, name):
+    """Создаёт ключ юзера для Redis."""
     return f"{PLATFORM}:user:{user_id}:{name}"
 
 
 def clear_current_question(user_id, redis_connect) -> None:
+    """Очищает текущий вопрос и ответ из Redis."""
     redis_connect.delete(
         user_key(user_id, "current_question"),
         user_key(user_id, "current_answer"),
@@ -48,6 +50,7 @@ def clear_current_question(user_id, redis_connect) -> None:
 
 
 def handle_new_question(vk_api, redis_connect, quiz, user_id) -> None:
+    """Запускает новый вопрос."""
     if redis_connect.get(user_key(user_id, "current_answer")) is not None:
         send_message(
             vk_api,
@@ -62,6 +65,7 @@ def handle_new_question(vk_api, redis_connect, quiz, user_id) -> None:
 
 
 def handle_solution_attempt(vk_api, redis_connect, user_id, text) -> None:
+    """Проверяет ответ и озвучивает результат."""
     current_answer = redis_connect.get(user_key(user_id, "current_answer"))
     if current_answer is None:
         send_message(vk_api, user_id, "Сначала нажми «Новый вопрос».")
@@ -83,6 +87,7 @@ def handle_solution_attempt(vk_api, redis_connect, user_id, text) -> None:
 
 
 def handle_give_up(vk_api, redis_connect, user_id) -> None:
+    """Показывает правильный ответ когда игрок сдался."""
     answer = redis_connect.get(user_key(user_id, "current_answer"))
     if answer is None:
         send_message(vk_api, user_id, "Сначала нажми «Новый вопрос».")
@@ -92,10 +97,12 @@ def handle_give_up(vk_api, redis_connect, user_id) -> None:
 
 
 def handle_score(vk_api, user_id) -> None:
+    """Показывает текущий счёт."""
     send_message(vk_api, user_id, "ТУ ДУ — мой счёт")
 
 
 def run_longpoll(longpoll, vk_api, redis_connect, quiz) -> None:
+    """Входит в режим игры"""
     for event in longpoll.listen():
         if event.type != VkEventType.MESSAGE_NEW or not event.to_me:
             continue
