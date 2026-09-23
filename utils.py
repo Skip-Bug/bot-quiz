@@ -12,7 +12,7 @@ def normalize(text):
     return text.strip().lower()
 
 
-def check(user_answer, correct_answer):
+def check_answer(user_answer, correct_answer):
     """Сравнивает ответы. Возвращает 'correct', 'close' или 'wrong'."""
     user_text = normalize(user_answer)
     correct_text = normalize(correct_answer)

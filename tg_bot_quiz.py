@@ -2,6 +2,7 @@ import random
 import sys
 from enum import Enum, auto
 from functools import wraps
+from typing import Callable
 
 import redis
 from environs import Env
@@ -15,7 +16,7 @@ from telegram.ext import (
     Updater,
 )
 
-from utils import build_collection, check
+from utils import build_collection, check_answer
 
 sys.stdout.reconfigure(encoding="utf-8")
 
@@ -26,7 +27,7 @@ class State(Enum):
     ANSWERING = auto()
 
 
-def send_typing_action(func):
+def send_typing_action(func) -> Callable:
     """Показывает «печатает...», пока работает хендлер."""
 
     @wraps(func)
@@ -58,7 +59,10 @@ def start(update: Update, context: CallbackContext) -> State:
 
 
 @send_typing_action
-def handle_new_question_request(update: Update, context: CallbackContext) -> State:
+def handle_new_question_request(
+    update: Update,
+    context: CallbackContext,
+) -> State:
     """Отправляет случайный вопрос и переходит в ANSWERING."""
     user_id = update.effective_user.id
     redis_connect = context.bot_data["redis"]
@@ -95,7 +99,7 @@ def handle_solution_attempt(update: Update, context: CallbackContext) -> State:
         update.message.reply_text("Сначала нажми «Новый вопрос».")
         return State.CHOOSING
 
-    result = check(update.message.text, current_answer)
+    result = check_answer(update.message.text, current_answer)
 
     if result == "correct":
         update.message.reply_text(f"Правильно! Ответ: {current_answer}")
