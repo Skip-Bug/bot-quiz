@@ -69,9 +69,13 @@ def handle_new_question_request(
     """Отправляет случайный вопрос и переходит в ANSWERING."""
     user_id = update.effective_user.id
     redis_connect = context.bot_data["redis"]
-    if redis_connect.get(user_key(PLATFORM, user_id, "current_answer")) is not None:
+    current_question = redis_connect.get(
+        user_key(PLATFORM, user_id, "current_question")
+    )
+    if current_question is not None:
         update.message.reply_text(
-            "Сначала ответь на текущий вопрос или нажми «Сдаться»."
+            f"Сначала ответь на текущий вопрос:\n\n{current_question}\n\n"
+            f"Или нажми «Сдаться»."
         )
         return State.ANSWERING
 

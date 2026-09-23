@@ -39,13 +39,18 @@ def send_message(vk_api, user_id, text, keyboard=None) -> None:
 
 def handle_new_question(vk_api, redis_connect, quiz, user_id) -> None:
     """Запускает новый вопрос."""
-    if redis_connect.get(user_key(PLATFORM, user_id, "current_answer")) is not None:
+    current_question = redis_connect.get(
+        user_key(PLATFORM, user_id, "current_question")
+    )
+    if current_question is not None:
         send_message(
             vk_api,
             user_id,
-            "Сначала ответь на текущий вопрос или нажми «Сдаться».",
+            f"Сначала ответь на текущий вопрос:\n\n{current_question}\n\n"
+            f"Или нажми «Сдаться».",
         )
         return
+
     question, answer = random.choice(quiz)
     redis_connect.set(user_key(PLATFORM, user_id, "current_question"), question)
     redis_connect.set(user_key(PLATFORM, user_id, "current_answer"), answer)
