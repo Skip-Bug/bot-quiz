@@ -5,7 +5,6 @@ from functools import wraps
 from typing import Callable
 
 import redis
-from environs import Env
 from telegram import ChatAction, ReplyKeyboardMarkup, Update
 from telegram.ext import (
     CallbackContext,
@@ -16,9 +15,13 @@ from telegram.ext import (
     Updater,
 )
 
-from utils import build_collection, check_answer
+from questions import build_collection
+from settings import REDIS_URL, TG_BOT_TOKEN
+from utils import check_answer, clear_current_question, user_key
 
 sys.stdout.reconfigure(encoding="utf-8")
+
+PLATFORM = "tg"
 
 
 # TO DO добавить логер
@@ -66,35 +69,27 @@ def handle_new_question_request(
     """Отправляет случайный вопрос и переходит в ANSWERING."""
     user_id = update.effective_user.id
     redis_connect = context.bot_data["redis"]
-    if redis_connect.get(f"tg:user:{user_id}:current_answer") is not None:
+    if redis_connect.get(user_key(PLATFORM, user_id, "current_answer")) is not None:
         update.message.reply_text(
             "Сначала ответь на текущий вопрос или нажми «Сдаться»."
         )
         return State.ANSWERING
 
     question, answer = random.choice(context.bot_data["quiz"])
-    redis_connect.set(f"tg:user:{user_id}:current_question", question)
-    redis_connect.set(f"tg:user:{user_id}:current_answer", answer)
+    redis_connect.set(user_key(PLATFORM, user_id, "current_question"), question)
+    redis_connect.set(user_key(PLATFORM, user_id, "current_answer"), answer)
 
     update.message.reply_text(question)
     return State.ANSWERING
 
 
-def clear_current_question(user_id: int, redis_connect) -> None:
-    """Удаляет текущий вопрос пользователя из Redis."""
-    redis_connect.delete(
-        f"tg:user:{user_id}:current_question",
-        f"tg:user:{user_id}:current_answer",
-    )
-
-
 @send_typing_action
 def handle_solution_attempt(update: Update, context: CallbackContext) -> State:
-    """Проверяет ответ. Возвращает в CHOOSING или остаётся в ANSWERING."""
+    """Проверяет ответ и озвучивает результат."""
     user_id = update.effective_user.id
     redis_connect = context.bot_data["redis"]
 
-    current_answer = redis_connect.get(f"tg:user:{user_id}:current_answer")
+    current_answer = redis_connect.get(user_key(PLATFORM, user_id, "current_answer"))
     if current_answer is None:
         update.message.reply_text("Сначала нажми «Новый вопрос».")
         return State.CHOOSING
@@ -103,7 +98,7 @@ def handle_solution_attempt(update: Update, context: CallbackContext) -> State:
 
     if result == "correct":
         update.message.reply_text(f"Правильно! Ответ: {current_answer}")
-        clear_current_question(user_id, redis_connect)
+        clear_current_question(PLATFORM, user_id, redis_connect)
         return State.CHOOSING
 
     if result == "close":
@@ -111,23 +106,23 @@ def handle_solution_attempt(update: Update, context: CallbackContext) -> State:
         return State.ANSWERING
 
     update.message.reply_text(f"Неверно. Правильный ответ: {current_answer}")
-    clear_current_question(user_id, redis_connect)
+    clear_current_question(PLATFORM, user_id, redis_connect)
     return State.CHOOSING
 
 
 @send_typing_action
 def handle_give_up(update: Update, context: CallbackContext) -> State:
-    """Показывает правильный ответ и возвращает в CHOOSING."""
+    """Показывает правильный ответ когда игрок сдался."""
     user_id = update.effective_user.id
     redis_connect = context.bot_data["redis"]
 
-    answer = redis_connect.get(f"tg:user:{user_id}:current_answer")
+    answer = redis_connect.get(user_key(PLATFORM, user_id, "current_answer"))
     if answer is None:
         update.message.reply_text("Сначала нажми «Новый вопрос».")
         return State.CHOOSING
 
     update.message.reply_text(f"Правильный ответ: {answer}")
-    clear_current_question(user_id, redis_connect)
+    clear_current_question(PLATFORM, user_id, redis_connect)
     return State.CHOOSING
 
 
@@ -177,11 +172,8 @@ def build_conv_handler() -> ConversationHandler:
 
 def main() -> None:
     """Запускает бота."""
-    env = Env()
-    env.read_env()
-    tg_token = env.str("TG_BOT_TOKEN")
-    redis_url = env.str("REDIS_URL", default="redis://localhost:6379/0")
-    redis_connect = redis.from_url(redis_url, decode_responses=True)
+    tg_token = TG_BOT_TOKEN
+    redis_connect = redis.from_url(REDIS_URL, decode_responses=True)
 
     updater = Updater(tg_token)
 
