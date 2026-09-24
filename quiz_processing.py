@@ -50,8 +50,8 @@ def iter_qa(contents):
             current_question = None
 
 
-def collect_dict(contents, seen):
-    """Собирает словарь без дублей."""
+def collect_quiz(contents, seen):
+    """Собирает вопросы и ответы без дублей."""
     quiz = {}
     for question, answer in iter_qa(contents):
         duplicate_key = fingerprint(question)
