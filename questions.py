@@ -1,6 +1,18 @@
+import json
 import os
+import random
 
 from text import clean_answer, clean_text, fingerprint
+
+
+def get_random_question(redis_connect):
+    """Возвращает question, answer."""
+    total = redis_connect.llen("quiz:questions")
+
+    index = random.randint(0, total - 1)
+    payload = redis_connect.lindex("quiz:questions", index)
+    quiz = json.loads(payload)
+    return quiz["q"], quiz["a"]
 
 
 def load_quiz(path):

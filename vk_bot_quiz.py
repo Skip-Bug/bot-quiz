@@ -1,4 +1,3 @@
-import random
 import time
 
 import redis
@@ -8,7 +7,7 @@ from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from vk_api.longpoll import VkEventType, VkLongPoll
 from vk_api.utils import get_random_id
 
-from questions import build_collection
+from questions import get_random_question
 from settings import REDIS_URL, VK_BOT_TOKEN
 from utils import check_answer, clear_current_question, user_key
 
@@ -37,7 +36,7 @@ def send_message(vk_api, user_id, text, keyboard=None) -> None:
     )
 
 
-def handle_new_question(vk_api, redis_connect, quiz, user_id) -> None:
+def handle_new_question(vk_api, redis_connect, user_id) -> None:
     """Запускает новый вопрос."""
     current_question = redis_connect.get(
         user_key(PLATFORM, user_id, "current_question")
@@ -51,7 +50,7 @@ def handle_new_question(vk_api, redis_connect, quiz, user_id) -> None:
         )
         return
 
-    question, answer = random.choice(quiz)
+    question, answer = get_random_question(redis_connect)
     redis_connect.set(user_key(PLATFORM, user_id, "current_question"), question)
     redis_connect.set(user_key(PLATFORM, user_id, "current_answer"), answer)
     send_message(vk_api, user_id, question)
@@ -94,7 +93,7 @@ def handle_score(vk_api, user_id) -> None:
     send_message(vk_api, user_id, "ТУ ДУ — мой счёт")
 
 
-def run_longpoll(longpoll, vk_api, redis_connect, quiz) -> None:
+def run_longpoll(longpoll, vk_api, redis_connect) -> None:
     """Входит в режим игры"""
     for event in longpoll.listen():
         if event.type != VkEventType.MESSAGE_NEW or not event.to_me:
@@ -114,7 +113,7 @@ def run_longpoll(longpoll, vk_api, redis_connect, quiz) -> None:
                 keyboard=build_keyboard(),
             )
         elif text == "Новый вопрос":
-            handle_new_question(vk_api, redis_connect, quiz, user_id)
+            handle_new_question(vk_api, redis_connect, user_id)
         elif text == "Сдаться":
             handle_give_up(vk_api, redis_connect, user_id)
         elif text == "Мой счёт":
@@ -130,13 +129,11 @@ def main():
 
     redis_connect = redis.from_url(REDIS_URL, decode_responses=True)
 
-    quiz = list(build_collection("quiz-questions").items())
-
     print("ВК бот запущен")
     while True:
         try:
             longpoll = VkLongPoll(vk_session)
-            run_longpoll(longpoll, vk_api, redis_connect, quiz)
+            run_longpoll(longpoll, vk_api, redis_connect)
         except (vk.ApiHttpError, requests.exceptions.ConnectionError) as e:
             print(f"Сетевая ошибка: {e}. Переподключение через 5 секунд...")
             time.sleep(5)
