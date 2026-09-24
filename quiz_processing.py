@@ -74,7 +74,7 @@ def build_collection(directory):
         path = os.path.join(directory, filename)
 
         try:
-            file_questions = collect_dict(load_quiz(path), seen)
+            file_questions = collect_quiz(load_quiz(path), seen)
         except (OSError, UnicodeDecodeError) as error:
             errors[filename] = str(error)
             continue
