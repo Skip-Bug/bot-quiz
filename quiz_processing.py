@@ -65,18 +65,20 @@ def build_collection(directory):
     """Создаёт сборник вопросов из всех .txt-файлов в директории."""
     quiz_collection = {}
     seen = set()
+    errors = {}
 
     for filename in sorted(os.listdir(directory)):
         if not filename.endswith(".txt"):
             continue
 
         path = os.path.join(directory, filename)
+
         try:
             file_questions = collect_dict(load_quiz(path), seen)
         except (OSError, UnicodeDecodeError) as error:
-            print(f"Пропущен {filename}: {error}")
+            errors[filename] = str(error)
             continue
 
         quiz_collection.update(file_questions)
 
-    return quiz_collection
+    return quiz_collection, errors

@@ -13,11 +13,16 @@ BATCH_SIZE = 1000
 def main():
     redis_connect = redis.from_url(REDIS_URL, decode_responses=True)
 
+    collection, errors = build_collection("quiz-questions")
+
+    for filename, message in errors.items():
+        print(f"Пропущен {filename}: {message}")
+
     redis_connect.delete("quiz:questions")
     pipeline = redis_connect.pipeline()
     count = 0
 
-    for question, answer in build_collection("quiz-questions").items():
+    for question, answer in collection.items():
         payload = json.dumps({"q": question, "a": answer}, ensure_ascii=False)
         pipeline.rpush("quiz:questions", payload)
         count += 1
