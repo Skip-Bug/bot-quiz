@@ -4,7 +4,17 @@
 
 Бот-викторина «Своя игра» для **Telegram** и **ВКонтакте**.
 Задаёт вопросы из базы, проверяет ответы с опечатками через нечёткое сравнение,
-хранит текущий вопрос каждого игрока в Redis.
+хранит текущий вопрос каждого игрока в Redis.   
+<table>
+    <tr>
+        <td align="center"><b>Telegram</b></td>
+        <td align="center"><b>VKontakte</b></td>
+    </tr>
+    <tr>
+        <td><img style="max-width:50%; height:auto;" alt="Screenshot 2026-09-24 124023" src="https://github.com/user-attachments/assets/8c84ff7f-eeb3-4719-875a-b02ea4de2276" /></td>
+        <td><img style="max-width:50%; height:auto;" alt="Screenshot 2026-09-24 123922" src="https://github.com/user-attachments/assets/406ac0ac-5499-4902-b732-9e4fb17bbf3a" /></td>
+    </tr>
+</table>
 
 [![GitHub Репозиторий](https://img.shields.io/badge/Репозиторий-GitHub-blue?logo=github)](https://github.com/Skip-Bug/bot-quiz)
 [![Лицензия MIT](https://img.shields.io/badge/Лицензия-MIT-blue.svg)](LICENSE)
@@ -58,6 +68,7 @@ redis-cli ping
 Создать токен: На вкладке «Ключи доступа» нажмите «Создать ключ» и дайте ему права на сообщения. Этот токен вставьте в переменную `VK_BOT_TOKEN`.
 
 Также надо включить возможности бота:
+<img style="max-width:100%; height:auto;" alt="Screenshot 2026-09-23 233306" src="https://github.com/user-attachments/assets/82d290b2-501f-43b8-9cb0-9b36fe59099d" />
 
 🧱 Установка
 📦 Установите зависимости:
