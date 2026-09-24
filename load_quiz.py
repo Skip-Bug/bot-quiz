@@ -7,17 +7,29 @@ import redis
 from questions import build_collection
 from settings import REDIS_URL
 
+BATCH_SIZE = 1000
+
 
 def main():
     redis_connect = redis.from_url(REDIS_URL, decode_responses=True)
 
     redis_connect.delete("quiz:questions")
+    pipeline = redis_connect.pipeline()
+    count = 0
+
     for question, answer in build_collection("quiz-questions").items():
         payload = json.dumps({"q": question, "a": answer}, ensure_ascii=False)
-        redis_connect.rpush("quiz:questions", payload)
+        pipeline.rpush("quiz:questions", payload)
+        count += 1
+        if count % BATCH_SIZE == 0:
+            pipeline.execute()
+            pipeline = redis_connect.pipeline()
+            print(f"Залито: {count}")
+
+    pipeline.execute()
 
     total = redis_connect.llen("quiz:questions")
-    print(f"Залито вопросов: {total}")
+    print(f"Готово. В Redis: {total}")
 
 
 if __name__ == "__main__":
