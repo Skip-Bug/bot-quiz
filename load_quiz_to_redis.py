@@ -4,7 +4,7 @@ import json
 
 import redis
 
-from questions import build_collection
+from quiz_processing import build_collection
 from settings import REDIS_URL
 
 BATCH_SIZE = 1000
