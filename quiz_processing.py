@@ -2,7 +2,7 @@ import json
 import os
 import random
 
-from text import clean_answer, clean_text, fingerprint
+from text_processing import clean_answer, clean_text, fingerprint
 
 
 def get_random_question(redis_connect):

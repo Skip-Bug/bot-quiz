@@ -111,7 +111,7 @@ REDIS_URL=redis://localhost:6379/0
 После первого запуска (и при изменении `.txt`) базу надо залить в Redis:
 
 ```bash
-python load_quiz.py
+python load_quiz_to_redis.py
 # → Залито вопросов: 300000
 ```
 
