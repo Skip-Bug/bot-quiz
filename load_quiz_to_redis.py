@@ -1,6 +1,6 @@
 """Скрипт заливки вопросов в Redis"""
-
 import json
+import time
 
 import redis
 
@@ -11,6 +11,8 @@ BATCH_SIZE = 1000
 
 
 def main():
+    start = time.monotonic()
+
     redis_connect = redis.from_url(REDIS_URL, decode_responses=True)
 
     collection, errors = build_collection("quiz-questions")
@@ -34,7 +36,8 @@ def main():
     pipeline.execute()
 
     total = redis_connect.llen("quiz:questions")
-    print(f"Готово. В Redis: {total}")
+    elapsed = time.monotonic() - start
+    print(f"Готово за {elapsed:.1f} сек. В Redis: {total}")
 
 
 if __name__ == "__main__":
