@@ -14,9 +14,9 @@ from telegram.ext import (
     Updater,
 )
 
-from questions import get_random_question
+from quiz_processing import get_random_question
 from settings import REDIS_URL, TG_BOT_TOKEN
-from utils import check_answer, clear_current_question, user_key
+from utils import build_user_key, check_answer, clear_current_question
 
 sys.stdout.reconfigure(encoding="utf-8")
 
@@ -69,7 +69,7 @@ def handle_new_question_request(
     user_id = update.effective_user.id
     redis_connect = context.bot_data["redis"]
     current_question = redis_connect.get(
-        user_key(PLATFORM, user_id, "current_question")
+        build_user_key(PLATFORM, user_id, "current_question")
     )
     if current_question is not None:
         update.message.reply_text(
@@ -79,8 +79,8 @@ def handle_new_question_request(
         return State.ANSWERING
 
     question, answer = get_random_question(redis_connect)
-    redis_connect.set(user_key(PLATFORM, user_id, "current_question"), question)
-    redis_connect.set(user_key(PLATFORM, user_id, "current_answer"), answer)
+    redis_connect.set(build_user_key(PLATFORM, user_id, "current_question"), question)
+    redis_connect.set(build_user_key(PLATFORM, user_id, "current_answer"), answer)
 
     update.message.reply_text(question)
     return State.ANSWERING
@@ -92,7 +92,9 @@ def handle_solution_attempt(update: Update, context: CallbackContext) -> State:
     user_id = update.effective_user.id
     redis_connect = context.bot_data["redis"]
 
-    current_answer = redis_connect.get(user_key(PLATFORM, user_id, "current_answer"))
+    current_answer = redis_connect.get(
+        build_user_key(PLATFORM, user_id, "current_answer")
+    )
     if current_answer is None:
         update.message.reply_text("Сначала нажми «Новый вопрос».")
         return State.CHOOSING
@@ -119,7 +121,7 @@ def handle_give_up(update: Update, context: CallbackContext) -> State:
     user_id = update.effective_user.id
     redis_connect = context.bot_data["redis"]
 
-    answer = redis_connect.get(user_key(PLATFORM, user_id, "current_answer"))
+    answer = redis_connect.get(build_user_key(PLATFORM, user_id, "current_answer"))
     if answer is None:
         update.message.reply_text("Сначала нажми «Новый вопрос».")
         return State.CHOOSING

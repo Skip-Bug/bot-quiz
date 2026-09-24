@@ -1,16 +1,16 @@
 from rapidfuzz import fuzz
 
-from text import normalize
+from text_processing import normalize
 
 
-def user_key(platform, user_id, name):
+def build_user_key(platform, user_id, name):
     return f"{platform}:user:{user_id}:{name}"
 
 
 def clear_current_question(platform, user_id, redis_connect):
     redis_connect.delete(
-        user_key(platform, user_id, "current_question"),
-        user_key(platform, user_id, "current_answer"),
+        build_user_key(platform, user_id, "current_question"),
+        build_user_key(platform, user_id, "current_answer"),
     )
 
 

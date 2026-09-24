@@ -7,9 +7,9 @@ from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from vk_api.longpoll import VkEventType, VkLongPoll
 from vk_api.utils import get_random_id
 
-from questions import get_random_question
+from quiz_processing import get_random_question
 from settings import REDIS_URL, VK_BOT_TOKEN
-from utils import check_answer, clear_current_question, user_key
+from utils import build_user_key, check_answer, clear_current_question
 
 # TO DO добавить логер
 
@@ -39,7 +39,7 @@ def send_message(vk_api, user_id, text, keyboard=None) -> None:
 def handle_new_question(vk_api, redis_connect, user_id) -> None:
     """Запускает новый вопрос."""
     current_question = redis_connect.get(
-        user_key(PLATFORM, user_id, "current_question")
+        build_user_key(PLATFORM, user_id, "current_question")
     )
     if current_question is not None:
         send_message(
@@ -51,14 +51,16 @@ def handle_new_question(vk_api, redis_connect, user_id) -> None:
         return
 
     question, answer = get_random_question(redis_connect)
-    redis_connect.set(user_key(PLATFORM, user_id, "current_question"), question)
-    redis_connect.set(user_key(PLATFORM, user_id, "current_answer"), answer)
+    redis_connect.set(build_user_key(PLATFORM, user_id, "current_question"), question)
+    redis_connect.set(build_user_key(PLATFORM, user_id, "current_answer"), answer)
     send_message(vk_api, user_id, question)
 
 
 def handle_solution_attempt(vk_api, redis_connect, user_id, text) -> None:
     """Проверяет ответ и озвучивает результат."""
-    current_answer = redis_connect.get(user_key(PLATFORM, user_id, "current_answer"))
+    current_answer = redis_connect.get(
+        build_user_key(PLATFORM, user_id, "current_answer")
+    )
     if current_answer is None:
         send_message(vk_api, user_id, "Сначала нажми «Новый вопрос».")
         return
@@ -80,7 +82,7 @@ def handle_solution_attempt(vk_api, redis_connect, user_id, text) -> None:
 
 def handle_give_up(vk_api, redis_connect, user_id) -> None:
     """Показывает правильный ответ когда игрок сдался."""
-    answer = redis_connect.get(user_key(PLATFORM, user_id, "current_answer"))
+    answer = redis_connect.get(build_user_key(PLATFORM, user_id, "current_answer"))
     if answer is None:
         send_message(vk_api, user_id, "Сначала нажми «Новый вопрос».")
         return
